@@ -1,0 +1,21 @@
+Math::Financial 0.75
+
+Eric Fixler <fix@fixler.com> 1999
+
+Contains common calculations for loans and anniuities.  Supports
+an object-oriented or procedural interface.
+
+INSTALLATION
+------------
+>perl Makefile.PL
+>make
+>make install
+
+There's just the one file, Financial.pm, so you can also
+just drag it to the Math/ folder of your local library
+tree.
+
+There are currently no tests defined.
+
+Complete documentation is podded in the module.
+Comments and questions welcome.
