@@ -4,7 +4,7 @@ package Math::Financial;
 # All rights reserved. This program is free software; 
 # you can redistribute it and/or modify it under the same terms as Perl itself. 
 
-# $Id: Financial.pm,v 1.2 1999/09/09 20:05:37 fix Exp fix $
+# $Id: Financial.pm,v 1.5 1999/09/15 19:08:41 fix Exp $
 # $Source: /www/cgi/lib/Math/RCS/Financial.pm,v $
 
 =pod 
@@ -30,7 +30,7 @@ directly to the methods.
 
 The attribute types, accessed through the C<get> and C<set> methods are
 
-=over 4
+=over4
 
 =item pv	=E<gt> 	Present Value
 
@@ -44,7 +44,7 @@ The attribute types, accessed through the C<get> and C<set> methods are
 
 =item tpy	=E<gt>	Terms Per Year (defaults to 12)
 
-=item pd	=E<gt>	Payments made so far (used only for loan balances)
+=item pd	=E<gt>	Payments made so far (used only for loan/annuity balances)
 
 =back
 
@@ -77,7 +77,7 @@ sub BEGIN {
 		use POSIX qw(:ctype_h);
 		use vars qw(@ISA $VERSION @EXPORT @EXPORT_OK %EXPORT_TAGS 
 					@ATTRIBUTES $DEFAULT_OBJECT $re_object);
-		$VERSION = 0.75;
+		$VERSION = 0.76;
 		use constant	PV	=>	0;
 		use constant	FV	=> 	1;
 		use constant	NP	=>	2;
@@ -89,10 +89,11 @@ sub BEGIN {
 		$re_object = '(?i)[a-z][\w]*?::[\w]';
 		@ISA = qw(Exporter);
 		@EXPORT= ();
-		@EXPORT_OK = qw(set get loan_term loan_payment compound_interest funding_annuity
+		@EXPORT_OK = qw(loan_term loan_payment compound_interest funding_annuity
 						loan_balance loan_size simple_interest);
-		%EXPORT_TAGS = ( procedural => \@EXPORT_OK );
-		}
+		%EXPORT_TAGS = ( procedural => \@EXPORT_OK,
+						 standard	=> \@EXPORT_OK);
+}
 
 
 sub new {
@@ -110,6 +111,9 @@ or feed attributes directly to the methods.
 
 There are no default values for any of the attributes except C<TPY> (Terms Per Year),
 which is 12 by default, and C<PD> which defaults to zero.
+
+If you don't want to use the object-oriented interface, see the L<EXPORTS> section
+below.
 
 =cut
 	my $class = ref($_[0]) || ($_[0] =~ /(.*?::.*)/)[0];
@@ -246,15 +250,15 @@ the second or third method.
 	}
 	eval {if ($solve_for == FV) {
 		$ir = ($numbers[0]/100) / $self->[TPY];
-		(undef,$pv,$np) = @numbers;
+		($pv,$np) = @numbers[1,2];
 		$result = abs($pv) * ( ($ir + 1) ** $np);
 	} elsif ($solve_for == PV) {
 		 $ir = ($numbers[0]/100) / $self->[TPY];
-		 (undef,$fv,$np) = @numbers;
+		 ($fv,$np) = @numbers[1,2];
 		 $result = abs($fv) * ( ($ir + 1) ** (0 - $np) );
 	} elsif ($solve_for == NP) {
-		$ir = ($numbers[0]/100) / $self->[TPY];
-		(undef,$pv,$fv) = @numbers;
+		$ir = $numbers[0]/100/$self->[TPY];
+		($pv,$fv) = @numbers[1,2];
 		my $num = log(abs($fv)/$pv);
 		my $den = log( 1 + $ir); 
 		$result = $num / $den;
@@ -292,7 +296,7 @@ my ($self,@args) = _get_self(@_);
 	my @numbers = $self->_verify_fields(IR,PMT,NP);
 	return undef unless scalar(@numbers);
 	my ($result); #solving for fv here
-	my (undef,$pmt,$np) = @numbers;
+	my ($pmt,$np) = @numbers[1,2];
 	my $ir = $numbers[0]/100/$self->[TPY];
 	eval { $result = ($pmt * ( ((1 + $ir) ** $np) - 1))/$ir; };
 	return $@ ? undef : $result;
@@ -320,7 +324,7 @@ if (scalar(@args)) {
 	}; 
 	my @numbers = $self->_verify_fields(IR,PMT,NP);
 	return undef unless scalar(@numbers);
-	my (undef,$pmt,$np) = @numbers;
+	my ($pmt,$np) = @numbers[1,2];
 	my $ir = $numbers[0]/100/$self->[TPY]; my ($result);
 	eval { 	my $a = (1 + $ir) ** ($self->[PD] - $np);
 			$result = $pmt/$ir * (1 - $a)  ; };
@@ -346,7 +350,7 @@ The ir, np, and pv fields must be set.
 	my @numbers = $self->_verify_fields(IR,PV,NP);
 	return undef unless scalar(@numbers);
 	my ($result,$ir);
-	my (undef,$pv,$np) =  @numbers;
+	my ($pv,$np) =  @numbers[1,2];
 	$ir = ($numbers[0]/100) / $self->[TPY];
 	my $a = (1 + $ir) ** (0 - $np);
 	my $denominator = 1 - $a;
@@ -378,7 +382,7 @@ my ($self,@args) = _get_self(@_);
 	my @numbers = $self->_verify_fields(IR,PMT,NP);
 	return undef unless scalar(@numbers);
 	my ($result);
-	my (undef,$pmt,$np) = @numbers;
+	my ($pmt,$np) = @numbers[1,2];
 	my $ir = $numbers[0]/100/$self->[TPY];
 	eval { $result = ($pmt * (1 - ((1 + $ir) ** (0 - $np))))/$ir; };
 	return $@ ? undef : $result;
@@ -402,9 +406,9 @@ C<ir>, payment amount C<pmt> and loan amount C<pv>.   The ir, pmt, and pv fields
 	}; 
 	my @numbers = $self->_verify_fields(IR,PMT,PV);
 	return undef unless scalar(@numbers);
-	my (undef, $pmt, $pv) =  @numbers;
+	my ($pmt, $pv) =  @numbers[1,2];
 	$pv = abs($pv);
-	$numbers[0] = $ir/100/$self->[TPY];
+	my $ir = $numbers[0]/100/$self->[TPY];
 	my ($result);
 	$result = eval {
 		my $numerator = log($pmt/($pmt - ($ir * $pv)));
@@ -485,16 +489,28 @@ __END__
 
 =head1 REQUIRES
 
-POSIX
+POSIX -- c_type functions
 
-(In the next release I'll provide a runtime replacement for the POSIX functions
-so it'll work on Win releases)
+(c_types might work under Windows.  I really don't know.  I'd appreciate it if someome
+would let me know.  If they don't, in a future release, 
+I'll provide a runtime replacement for the POSIX functions so it'll work on Win releases.  )
 
 =head1 EXPORTS
 
 By default, nothing.
 
-If you'd like to use a procedural interface, you can C<use Math::Financial qw(:procedural)>.
+If you'd like to use a procedural interface, you can C<use Math::Financial qw(:standard)>.
+
+Then you can call the methods as function, without an object reference, like
+
+C<$term = loan_term(ir =E<gt> 6.5, pmt =E<gt> 1000, pv =E<gt> 200000);>
+
+All of the methods are exported in this fashion, except for C<set> and C<get>; this
+just seemed too confusing.
+
+You can still use the facility of C<set> and C<get> with the procedural interface (i.e., you
+can set the attributes and them use them for many different calculations), but you
+must call them as C<Math::Financial::set> and C<Math::Financial::get>.
 
 =head1	AUTHOR
 
@@ -513,3 +529,11 @@ was essential for this project.
 
 =cut
 
+#$Log: Financial.pm,v $
+#Revision 1.5  1999/09/15 19:08:41  fix
+#Added :standard EXPORT group.  Added a few lines of documentation.
+#
+#Revision 1.4  1999/09/15 18:49:01  fix
+#Changed some syntax so it'll work with perl 5.004.
+#Fixed an error in the loan_term method
+#
